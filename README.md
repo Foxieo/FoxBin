@@ -1,10 +1,11 @@
-# FoxBin 🦊🗑️
+# FoxTrash 🦊🗑️
 
 <div align="center">
-<img width="756" height="778" alt="Group 27" src="https://github.com/user-attachments/assets/0f69e3bb-811c-4cdd-b8da-7441f6aacdc9" />
+<img width="1400" height="742" alt="FoxTrash Presents" src="https://github.com/user-attachments/assets/8e4c44da-8615-4ad3-a996-4d5e7f15cb2a" />
+
 </div>
 <br>
-<img width="1259" height="614" alt="Group 29 (1)" src="https://github.com/user-attachments/assets/385ef260-e590-434c-bd83-d158a97c3c13" />
+
 <br>
 <br>
 <div align="center">
