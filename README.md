@@ -6,6 +6,7 @@
 <br>
 <img width="1259" height="614" alt="Group 29 (1)" src="https://github.com/user-attachments/assets/385ef260-e590-434c-bd83-d158a97c3c13" />
 <br>
+<br>
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
