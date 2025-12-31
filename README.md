@@ -3,10 +3,8 @@
 <div align="center">
 <img width="756" height="778" alt="Group 27" src="https://github.com/user-attachments/assets/0f69e3bb-811c-4cdd-b8da-7441f6aacdc9" />
 </div>
-
-![Uploading Group 29 (1).png…]()
-
-
+<br>
+<img width="1259" height="614" alt="Group 29 (1)" src="https://github.com/user-attachments/assets/385ef260-e590-434c-bd83-d158a97c3c13" />
 <br>
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Platform">
