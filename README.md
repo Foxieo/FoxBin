@@ -4,6 +4,10 @@
 <img width="756" height="778" alt="Group 27" src="https://github.com/user-attachments/assets/0f69e3bb-811c-4cdd-b8da-7441f6aacdc9" />
 </div>
 
+![Uploading Group 29 (1).png…]()
+
+
+<br>
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
