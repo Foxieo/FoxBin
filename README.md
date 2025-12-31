@@ -1,6 +1,8 @@
 # FoxBin 🦊🗑️
 
+<div align="center">
 <img width="756" height="778" alt="Group 27" src="https://github.com/user-attachments/assets/0f69e3bb-811c-4cdd-b8da-7441f6aacdc9" />
+</div>
 
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Platform">
