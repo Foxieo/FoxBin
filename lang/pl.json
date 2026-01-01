@@ -1,0 +1,23 @@
+{
+    "filedialog.title": "Wybierz ikonę",
+    "element.close": "Zamknij",
+    "element.add_startup": "Dodaj do autostartu",
+    "element.remove_startup": "Usuń z autostartu",
+    "element.clear": "Wyczyść",
+    "element.open": "Otwórz",
+    "element.icon_menu": "Ikona",
+    "element.lang_menu": "Język",
+    "element.change_icon": "Zmień",
+    "element.reset_icon": "Resetuj",
+    "element.settings": "Ustawienia",
+    "element.close_settings": "Zamknij",
+    "settings.title": "Ustawienia",
+    "settings.icon_empty": "Ikona pustego kosza:",
+    "settings.icon_full": "Ikona pełnego kosza:",
+    "tooltip.kb": "KB",
+    "tooltip.mb": "MB",
+    "tooltip.gb": "GB",
+    "tooltip.f1": "plik",
+    "tooltip.f2": "pliki",
+    "tooltip.f3": "plików"
+}

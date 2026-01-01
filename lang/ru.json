@@ -1,0 +1,23 @@
+{
+    "filedialog.title": "Выберите иконку",
+    "element.close": "Выход",
+    "element.add_startup": "Добавить в автозагрузку",
+    "element.remove_startup": "Удалить из автозагрузки",
+    "element.clear": "Очистить",
+    "element.open": "Открыть",
+    "element.icon_menu": "Иконка",
+    "element.lang_menu": "Язык",
+    "element.change_icon": "Сменить",
+    "element.reset_icon": "Сбросить",
+    "element.settings": "Настройки",
+    "element.close_settings": "Закрыть",
+    "settings.title": "Настройки",
+    "settings.icon_empty": "Иконка пустой корзины: ",
+    "settings.icon_full": "Иконка полной корзины:",
+    "tooltip.kb": "КБ",
+    "tooltip.mb": "МБ",
+    "tooltip.gb": "ГБ",
+    "tooltip.f1": "файл",
+    "tooltip.f2": "файла",
+    "tooltip.f3": "файлов"
+}
