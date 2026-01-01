@@ -9,7 +9,6 @@
 <br>
 <br>
 <div align="center">
-  <img src="https://img.shields.io/badge/Download-FoxBin-blue?style=for-the-badge&logo=windows" alt="https://github.com/Foxieo/FoxBin/releases">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PyQt6">
