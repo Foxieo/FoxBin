@@ -1,1 +1,7 @@
-{"app_name": "FoxBin", "icon_path": "./assets/white_empty.ico", "version": "v0.1.0", "lang": "./lang/ru.json", "icon_empty": "./assets/white_empty.ico", "icon_full": "./assets/white_full.ico"}
+{
+  "app_name": "FoxBin",
+  "lang": "./lang/en.json",
+  "icon_empty": "./assets/white_empty.png",
+  "icon_full": "./assets/white_full.png",
+  "version": "v0.1.0"
+}
