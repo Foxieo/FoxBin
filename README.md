@@ -1,4 +1,4 @@
-# FoxTrash 🦊🗑️
+# FoxBin 🦊🗑️
 
 <div align="center">
 <img width="1400" height="742" alt="FoxTrash Presents" src="https://github.com/user-attachments/assets/8e4c44da-8615-4ad3-a996-4d5e7f15cb2a" />
