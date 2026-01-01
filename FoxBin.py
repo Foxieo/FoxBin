@@ -1,16 +1,36 @@
-import winshell, json, os, sys, ctypes, winreg
+import winshell, json, os, sys, ctypes, winreg, time
 from ctypes import windll, wintypes
 from send2trash import send2trash
-from PyQt6.QtWidgets import QApplication, QWidget, QSystemTrayIcon, QMenu, QFileDialog, QVBoxLayout, QPushButton, QCheckBox, QComboBox, QLabel, QDialog, QHBoxLayout
+from PyQt6.QtWidgets import QApplication, QWidget, QSystemTrayIcon, QMenu, QFileDialog, QVBoxLayout, QPushButton, QCheckBox, QComboBox, QLabel, QDialog, QHBoxLayout, QGroupBox
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QCursor, QIcon, QPixmap
 
-def sysThemeIsDark():
-    registry = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
-    value, _ = winreg.QueryValueEx(registry, "AppsUseLightTheme")
-    return value == 0
+# Кэш для темы Windows (TTL 5 секунд)
+_theme_cache = {"time": 0, "value": None, "ttl": 5}
 
-def translatable(key:str):
+def sysThemeIsDark():
+    """Проверяет, используется ли темная тема Windows с кэшированием"""
+    global _theme_cache
+    current_time = time.time()
+    
+    # Если кэш валиден, возвращаем сохраненное значение
+    if _theme_cache["time"] + _theme_cache["ttl"] > current_time:
+        return _theme_cache["value"]
+    
+    # Иначе обновляем кэш
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                          r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
+            value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            result = value == 0
+            _theme_cache = {"time": current_time, "value": result, "ttl": 5}
+            return result
+    except:
+        # В случае ошибки возвращаем последнее сохраненное значение или True
+        return _theme_cache["value"] if _theme_cache["value"] is not None else True
+
+def translatable(key: str):
+    """Получает переведенное значение по ключу"""
     try: 
         return translation[key]
     except: 
@@ -24,21 +44,46 @@ class BinInfo(ctypes.Structure):
     ]
 
 class SettingsDialog(QDialog):
+    # Константы путей к иконкам
+    DEFAULT_ICON_PATHS = {
+        "empty_dark": "./assets/white_empty.png",
+        "full_dark": "./assets/white_full.png", 
+        "empty_light": "./assets/black_empty.png",
+        "full_light": "./assets/black_full.png"
+    }
+    
     def __init__(self, tray):
         super().__init__()
         self.tray = tray
         self.setWindowTitle(translatable("settings.title"))
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
-        self.setFixedSize(350, 300)
+        self.setFixedSize(260, 350)  # Увеличил высоту для рамок
+        self.setWindowIcon(QIcon('FoxBin.ico'))
         
+        # Создаем layout
         layout = QVBoxLayout()
+        layout.setSpacing(10)
         
-        self.startup_checkbox = QCheckBox(translatable("element.add_startup"))
-        self.startup_checkbox.setChecked(tray.isInStartup(settings["app_name"]))
-        self.startup_checkbox.stateChanged.connect(self.toggleStartup)
-        layout.addWidget(self.startup_checkbox)
+        # === ГРУППА: ЯЗЫК ===
+        lang_group = QGroupBox(translatable("element.lang_menu"))
+        lang_group.setStyleSheet("""
+            QGroupBox {
+                color: #CCC;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         
-        layout.addWidget(QLabel(translatable("element.lang_menu")))
+        lang_layout = QVBoxLayout()
+        lang_layout.setContentsMargins(10, 2, 10, 10)
+        
         self.lang_combo = QComboBox()
         self.languages = {
             "Русский": "./lang/ru.json",
@@ -55,92 +100,260 @@ class SettingsDialog(QDialog):
             "한국어": "./lang/ko.json"
         }
         
-        current_lang_path = settings["lang"]
+        # Заполняем комбобокс и выбираем текущий язык
+        current_lang = settings["lang"]
         current_lang_name = "English"
         for name, path in self.languages.items():
             self.lang_combo.addItem(name)
-            if path == current_lang_path:
+            if path == current_lang:
                 current_lang_name = name
         
         self.lang_combo.setCurrentText(current_lang_name)
         self.lang_combo.currentTextChanged.connect(self.changeLangFromCombo)
-        layout.addWidget(self.lang_combo)
+        lang_layout.addWidget(self.lang_combo)
         
-        icon_empty_layout = QHBoxLayout()
-        self.icon_empty_label = QLabel(translatable("settings.icon_empty"))
-        icon_empty_layout.addWidget(self.icon_empty_label)
+        lang_group.setLayout(lang_layout)
+        layout.addWidget(lang_group)
         
+        # === ГРУППА: АВТОЗАПУСК ===
+        startup_group = QGroupBox(translatable("element.add_startup"))
+        startup_group.setStyleSheet("""
+            QGroupBox {
+                color: #CCC;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 5px;
+                margin-top: 5px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        
+        startup_layout = QVBoxLayout()
+        startup_layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.startup_checkbox = QCheckBox(translatable("element.add_startup"))
+        self.startup_checkbox.setChecked(tray.isInStartup(settings["app_name"]))
+        self.startup_checkbox.stateChanged.connect(self.toggleStartup)
+        startup_layout.addWidget(self.startup_checkbox)
+        
+        startup_group.setLayout(startup_layout)
+        layout.addWidget(startup_group)
+        
+        # === ГРУППА: ИКОНКА ПУСТОЙ КОРЗИНЫ ===
+        icon_empty_group = QGroupBox(translatable("settings.icon_empty"))
+        icon_empty_group.setStyleSheet("""
+            QGroupBox {
+                color: #CCC;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 5px;
+                margin-top: 5px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+
+        icon_empty_layout = QVBoxLayout()
+        icon_empty_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Основной layout для превью и кнопок В ОДНОЙ СТРОЧКЕ
+        icon_empty_main_layout = QHBoxLayout()
+
+        # Превью иконки
         self.icon_empty_preview = QLabel()
         self.icon_empty_preview.setFixedSize(30, 30)
-        self.icon_empty_preview.setStyleSheet("background-color: #333333; border: 1px solid #555555; padding: 2px; border-radius: 4px;")
-        icon_empty_layout.addWidget(self.icon_empty_preview)
-        icon_empty_layout.addStretch()
-        
-        layout.addLayout(icon_empty_layout)
-        
-        icon_empty_buttons_layout = QHBoxLayout()
+        self.icon_empty_preview.setObjectName("preview_empty")
+        self.icon_empty_preview.setStyleSheet("""
+            background-color: #333333;
+            border: 1px solid #555555;
+            padding: 2px;
+            border-radius: 4px;
+        """)
+        icon_empty_main_layout.addWidget(self.icon_empty_preview)
+        icon_empty_main_layout.addSpacing(10)
+
+        # КНОПКИ В ОДНОЙ СТРОЧКЕ (горизонтально)
         self.btn_change_empty = QPushButton(translatable("element.change_icon"))
+        self.btn_change_empty.setObjectName("btn_change_empty")
         self.btn_change_empty.clicked.connect(lambda: self.changeIcon("empty"))
-        icon_empty_buttons_layout.addWidget(self.btn_change_empty)
+        icon_empty_main_layout.addWidget(self.btn_change_empty)
+
         self.btn_reset_empty = QPushButton(translatable("element.reset_icon"))
+        self.btn_reset_empty.setObjectName("btn_reset_empty")
         self.btn_reset_empty.clicked.connect(lambda: self.resetIcon("empty"))
-        icon_empty_buttons_layout.addWidget(self.btn_reset_empty)
-        layout.addLayout(icon_empty_buttons_layout)
-        
-        icon_full_layout = QHBoxLayout()
-        self.icon_full_label = QLabel(translatable("settings.icon_full"))
-        icon_full_layout.addWidget(self.icon_full_label)
-        
+        icon_empty_main_layout.addWidget(self.btn_reset_empty)
+
+        icon_empty_main_layout.addStretch()
+
+        icon_empty_layout.addLayout(icon_empty_main_layout)
+        icon_empty_group.setLayout(icon_empty_layout)
+        layout.addWidget(icon_empty_group)
+
+        # === ГРУППА: ИКОНКА ПОЛНОЙ КОРЗИНЫ ===
+        icon_full_group = QGroupBox(translatable("settings.icon_full"))
+        icon_full_group.setStyleSheet("""
+            QGroupBox {
+                color: #CCC;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 5px;
+                margin-top: 5px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+
+        icon_full_layout = QVBoxLayout()
+        icon_full_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Основной layout для превью и кнопок В ОДНОЙ СТРОЧКЕ
+        icon_full_main_layout = QHBoxLayout()
+
+        # Превью иконки
         self.icon_full_preview = QLabel()
         self.icon_full_preview.setFixedSize(30, 30)
-        self.icon_full_preview.setStyleSheet("background-color: #333333; border: 1px solid #555555; padding: 2px; border-radius: 4px;")
-        icon_full_layout.addWidget(self.icon_full_preview)
-        icon_full_layout.addStretch()
-        
-        layout.addLayout(icon_full_layout)
-        
-        icon_full_buttons_layout = QHBoxLayout()
+        self.icon_full_preview.setObjectName("preview_full")
+        self.icon_full_preview.setStyleSheet("""
+            background-color: #333333;
+            border: 1px solid #555555;
+            padding: 2px;
+            border-radius: 4px;
+        """)
+        icon_full_main_layout.addWidget(self.icon_full_preview)
+        icon_full_main_layout.addSpacing(10)
+
+        # КНОПКИ В ОДНОЙ СТРОЧКЕ (горизонтально)
         self.btn_change_full = QPushButton(translatable("element.change_icon"))
+        self.btn_change_full.setObjectName("btn_change_full")
         self.btn_change_full.clicked.connect(lambda: self.changeIcon("full"))
-        icon_full_buttons_layout.addWidget(self.btn_change_full)
+        icon_full_main_layout.addWidget(self.btn_change_full)
+
         self.btn_reset_full = QPushButton(translatable("element.reset_icon"))
+        self.btn_reset_full.setObjectName("btn_reset_full")
         self.btn_reset_full.clicked.connect(lambda: self.resetIcon("full"))
-        icon_full_buttons_layout.addWidget(self.btn_reset_full)
-        layout.addLayout(icon_full_buttons_layout)
+        icon_full_main_layout.addWidget(self.btn_reset_full)
+
+        icon_full_main_layout.addStretch()
+
+        icon_full_layout.addLayout(icon_full_main_layout)
+        icon_full_group.setLayout(icon_full_layout)
+        layout.addWidget(icon_full_group)
         
+        # === КНОПКА ЗАКРЫТИЯ ===
         btn_close = QPushButton(translatable("element.close_settings"))
         btn_close.clicked.connect(self.close)
         layout.addWidget(btn_close)
         
-        self.setLayout(layout)
-        self.setStyleSheet("""
-            QDialog{background-color:#252525;color:#FFF}
-            QLabel{color:#FFF;padding:5px}
-            QCheckBox{color:#FFF;padding:5px}
-            QComboBox{background-color:#333;color:#FFF;border:1px solid #555;padding:6px;border-radius:3px}
-            QPushButton{background-color:#333;color:#FFF;border:1px solid #555;padding:6px;border-radius:3px;margin:2px}
-            QPushButton:hover{background-color:#444}
-        """)
+        # Отступ
+        layout.addStretch()
         
+        self.setLayout(layout)
+        self.applyStyleSheet()
+        
+        # Обновляем превью иконок
         self.updateIconPreview("empty")
         self.updateIconPreview("full")
     
+    def applyStyleSheet(self):
+        """Применяет стили к диалогу"""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #252525;
+                color: #FFF;
+            }
+            QLabel {
+                color: #FFF;
+                padding: 4px 0px;
+            }
+            QCheckBox {
+                color: #FFF;
+                padding: 6px 1px;
+                spacing: 8px;
+            }
+            QComboBox {
+                background-color: #333;
+                color: #FFF;
+                border: 1px solid #555;
+                padding: 4px;
+                border-radius: 4px;
+                min-height: 14px;
+            }
+            QComboBox:hover {
+                border: 1px solid #666;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #333;
+                color: #FFF;
+                border: 1px solid #555;
+                selection-background-color: #0078d4;
+            }
+            QPushButton {
+                background-color: #333;
+                color: #FFF;
+                border: 1px solid #555;
+                padding: 6px 12px;
+                border-radius: 4px;
+                min-height: 15px;
+            }
+            QPushButton:hover {
+                background-color: #3a3a3a;
+                border: 1px solid #666;
+            }
+            QPushButton:pressed {
+                background-color: #2d2d2d;
+            }
+        """)
+    
     def updateIconPreview(self, icon_type):
-        icon_path = settings.get("icon_empty", "./assets/white_empty.ico") if icon_type == "empty" else settings.get("icon_full", "./assets/white_full.ico")
+        """Обновляет превью иконки"""
+        key = "icon_empty" if icon_type == "empty" else "icon_full"
         preview_label = self.icon_empty_preview if icon_type == "empty" else self.icon_full_preview
         
+        if not preview_label:
+            return
+            
+        icon_path = settings.get(key, "")
+        
+        # Если путь не указан или файл не существует, используем дефолтную иконку
+        if not icon_path or not os.path.exists(icon_path):
+            is_dark = sysThemeIsDark()
+            if icon_type == "empty":
+                icon_path = self.DEFAULT_ICON_PATHS["empty_dark" if is_dark else "empty_light"]
+            else:
+                icon_path = self.DEFAULT_ICON_PATHS["full_dark" if is_dark else "full_light"]
+        
+        # Загружаем и масштабируем иконку
         if os.path.exists(icon_path):
             pixmap = QPixmap(icon_path)
             if not pixmap.isNull():
-                pixmap = pixmap.scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                pixmap = pixmap.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, 
+                                      Qt.TransformationMode.SmoothTransformation)
                 preview_label.setPixmap(pixmap)
                 preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            else:
-                preview_label.clear()
-        else:
-            preview_label.clear()
+                return
+        
+        # Если что-то пошло не так, очищаем
+        preview_label.clear()
     
     def toggleStartup(self, state):
+        """Включает/выключает автозапуск"""
         if state:
             self.tray.addToStartup(settings["app_name"])
             self.startup_checkbox.setText(translatable("element.remove_startup"))
@@ -149,59 +362,72 @@ class SettingsDialog(QDialog):
             self.startup_checkbox.setText(translatable("element.add_startup"))
     
     def changeLangFromCombo(self, lang_name):
+        """Меняет язык приложения"""
         lang_path = self.languages.get(lang_name)
         if lang_path:
             self.tray.setLang(lang_path)
     
     def changeIcon(self, icon_type):
-        file, _ = QFileDialog.getOpenFileName(self, translatable("filedialog.title"), "", "Images (*.png; *.jpg; *.jpeg; *.ico)")
+        """Меняет иконку через диалог выбора файла"""
+        file, _ = QFileDialog.getOpenFileName(
+            self, 
+            translatable("filedialog.title"), 
+            "", 
+            "Images (*.png; *.jpg; *.jpeg; *.ico)"
+        )
+        
         if file:
-            settings["icon_empty" if icon_type == "empty" else "icon_full"] = file
-            with open("./settings.json", "w") as f:
-                json.dump(settings, f)
+            key = "icon_empty" if icon_type == "empty" else "icon_full"
+            settings[key] = file
+            
+            # Сохраняем настройки
+            with open("./settings.json", "w", encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+            
+            # Обновляем иконки
             self.tray.updateIcon()
             self.updateIconPreview(icon_type)
     
     def resetIcon(self, icon_type):
-        settings["icon_empty" if icon_type == "empty" else "icon_full"] = "./assets/white_empty.ico" if icon_type == "empty" else "./assets/white_full.ico"
-        with open("./settings.json", "w") as f:
-            json.dump(settings, f)
+        """Сбрасывает иконку на дефолтную"""
+        is_dark = sysThemeIsDark()
+        
+        # Выбираем правильную дефолтную иконку
+        if icon_type == "empty":
+            new_path = self.DEFAULT_ICON_PATHS["empty_dark" if is_dark else "empty_light"]
+        else:
+            new_path = self.DEFAULT_ICON_PATHS["full_dark" if is_dark else "full_light"]
+        
+        # Сохраняем
+        key = "icon_empty" if icon_type == "empty" else "icon_full"
+        settings[key] = new_path
+        
+        with open("./settings.json", "w", encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+        
+        # Обновляем иконки
         self.tray.updateIcon()
         self.updateIconPreview(icon_type)
     
     def closeEvent(self, event):
+        """Скрываем окно вместо закрытия"""
         self.hide()
         event.ignore()
 
 class TrashTrayIcon(QSystemTrayIcon):
     def __init__(self, icon):
         super().__init__(icon)
-        
         self.activated.connect(self.onTrayActivated)
         
+        # Создаем меню
         self.menu = QMenu()
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
-        self.menu.setStyleSheet("""
-            QMenu{background-color:#252525;border:1px solid #555;padding:1px;border-radius:5px}
-            QMenu::item{background-color:transparent;padding:6px 30px 6px 25px;margin:1px;color:#FFF}
-            QMenu::item:selected{background-color:#333;color:#FFF}
-            QMenu::item:disabled{color:#808080}
-            QMenu::separator{height:1px;background-color:#C0C0C0;margin:3px 8px}
-            QMenu::icon{margin-left:3px}
-            QMenu::right-arrow{image:none;margin-right:3px}
-        """)
+        self.applyMenuStyle()
         
-        self.open_bin = self.menu.addAction(translatable("element.open"))
-        self.open_bin.triggered.connect(self.openRecycleBin)
-        self.clear_bin = self.menu.addAction(translatable("element.clear"))
-        self.clear_bin.triggered.connect(self.clearBin)
-        self.menu.addSeparator()
-        self.settings_action = self.menu.addAction(translatable("element.settings"))
-        self.settings_action.triggered.connect(self.openSettings)
-        self.menu.addSeparator()
-        self.exit_action = self.menu.addAction(translatable("element.close"))
-        self.exit_action.triggered.connect(self.exitApp)
+        # Создаем действия меню
+        self.createMenuActions()
         
+        # Таймеры
         self.tooltip_timer = QTimer()
         self.tooltip_timer.timeout.connect(self.formatTooltip)
         self.tooltip_timer.start(500)
@@ -217,25 +443,81 @@ class TrashTrayIcon(QSystemTrayIcon):
         self.settings_dialog = None
         self.setContextMenu(self.menu)
     
+    def applyMenuStyle(self):
+        """Применяет стили к меню"""
+        self.menu.setStyleSheet("""
+            QMenu {
+                background-color: #252525;
+                border: 1px solid #555;
+                padding: 1px;
+                border-radius: 5px;
+            }
+            QMenu::item {
+                background-color: transparent;
+                padding: 6px 30px 6px 25px;
+                margin: 1px;
+                color: #FFF;
+            }
+            QMenu::item:selected {
+                background-color: #333;
+                color: #FFF;
+            }
+            QMenu::item:disabled {
+                color: #808080;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #C0C0C0;
+                margin: 3px 8px;
+            }
+            QMenu::icon {
+                margin-left: 3px;
+            }
+            QMenu::right-arrow {
+                image: none;
+                margin-right: 3px;
+            }
+        """)
+    
+    def createMenuActions(self):
+        """Создает действия для меню"""
+        self.open_bin = self.menu.addAction(translatable("element.open"))
+        self.open_bin.triggered.connect(self.openRecycleBin)
+        
+        self.clear_bin = self.menu.addAction(translatable("element.clear"))
+        self.clear_bin.triggered.connect(self.clearBin)
+        
+        self.menu.addSeparator()
+        
+        self.settings_action = self.menu.addAction(translatable("element.settings"))
+        self.settings_action.triggered.connect(self.openSettings)
+        
+        self.menu.addSeparator()
+        
+        self.exit_action = self.menu.addAction(translatable("element.close"))
+        self.exit_action.triggered.connect(self.exitApp)
+    
     def onTrayActivated(self, reason):
+        """Обрабатывает клики по иконке в трее"""
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.openRecycleBin()
     
     def openRecycleBin(self):
+        """Открывает корзину"""
         try:
             os.startfile("shell:RecycleBinFolder")
         except:
-            try:
-                os.system('explorer shell:RecycleBinFolder')
-            except:
-                os.system('start shell:RecycleBinFolder')
+            # Резервный способ
+            os.system('explorer shell:RecycleBinFolder')
     
     def exitApp(self):
+        """Выход из приложения"""
         if self.settings_dialog:
             self.settings_dialog.close()
         QApplication.quit()
     
     def openSettings(self):
+        """Открывает окно настроек"""
         if not self.settings_dialog:
             self.settings_dialog = SettingsDialog(self)
         
@@ -248,86 +530,141 @@ class TrashTrayIcon(QSystemTrayIcon):
         self.menu.close()
     
     def isInStartup(self, name):
+        """Проверяет, добавлено ли приложение в автозагрузку"""
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ)
-            winreg.QueryValueEx(key, name)
-            winreg.CloseKey(key)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"Software\Microsoft\Windows\CurrentVersion\Run",
+                              0, winreg.KEY_READ) as key:
+                winreg.QueryValueEx(key, name)
             return True
         except FileNotFoundError:
             return False
-        
+    
     def addToStartup(self, name):
-        path = f"{os.path.dirname(os.path.abspath(sys.argv[0]))}\\{settings['app_name']}.exe"
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, path)
-        winreg.CloseKey(key)
+        """Добавляет приложение в автозагрузку"""
+        try:
+            exe_path = os.path.abspath(sys.argv[0])
+            if exe_path.endswith('.py'):
+                cmd = f'"{sys.executable}" "{exe_path}"'
+            else:
+                cmd = f'"{exe_path}"'
+            
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"Software\Microsoft\Windows\CurrentVersion\Run",
+                              0, winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, name, 0, winreg.REG_SZ, cmd)
+        except Exception as e:
+            print(f"Ошибка добавления в автозагрузку: {e}")
     
     def removeFromStartup(self, name):
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        winreg.DeleteValue(key, name)
-        winreg.CloseKey(key)
+        """Удаляет приложение из автозагрузки"""
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"Software\Microsoft\Windows\CurrentVersion\Run",
+                              0, winreg.KEY_SET_VALUE) as key:
+                winreg.DeleteValue(key, name)
+        except Exception as e:
+            print(f"Ошибка удаления из автозагрузки: {e}")
     
     def setIconTheme(self):
-        if settings["icon_empty"] in ["./assets/white_empty.ico", "./assets/white_empty.ico"]:
-            if sysThemeIsDark():
-                settings["icon_empty"] = "./assets/white_empty.ico"
-                settings["icon_full"] = "./assets/white_full.ico"
-            else:
-                settings["icon_empty"] = "./assets/white_empty.ico"
-                settings["icon_full"] = "./assets/white_full.ico"
+        """Обновляет иконки в зависимости от темы Windows"""
+        # Определяем дефолтные иконки
+        default_icons = {
+            "./assets/white_empty.png",
+            "./assets/white_full.png",
+            "./assets/black_empty.png",
+            "./assets/black_full.png"
+        }
+        
+        # Если используется дефолтная иконка, проверяем тему
+        if settings.get("icon_empty", "") in default_icons:
+            is_dark = sysThemeIsDark()
             
-            with open("./settings.json", "w") as file:
-                json.dump(settings, file)
+            if is_dark:
+                settings["icon_empty"] = "./assets/white_empty.png"
+                settings["icon_full"] = "./assets/white_full.png"
+            else:
+                settings["icon_empty"] = "./assets/black_empty.png"
+                settings["icon_full"] = "./assets/black_full.png"
+            
+            # Сохраняем настройки
+            with open("./settings.json", "w", encoding='utf-8') as file:
+                json.dump(settings, file, ensure_ascii=False, indent=2)
+            
             self.updateIcon()
     
     def updateIcon(self):
+        """Обновляет иконку в трее в зависимости от состояния корзины"""
         has_files = bool(list(winshell.recycle_bin()))
-        icon_path = settings.get("icon_full", "./assets/white_full.ico") if has_files else settings.get("icon_empty", "./assets/white_empty.ico")
+        icon_key = "icon_full" if has_files else "icon_empty"
+        icon_path = settings.get(icon_key, "")
         
-        if os.path.exists(icon_path):
-            self.setIcon(QIcon(icon_path))
-        else:
-            default_icon = "./assets/white_full.ico" if has_files else "./assets/white_empty.ico"
-            self.setIcon(QIcon(default_icon))
-                
-    def setLang(self, file): 
+        # Если путь не указан или файл не существует, используем дефолтную иконку
+        if not icon_path or not os.path.exists(icon_path):
+            is_dark = sysThemeIsDark()
+            if has_files:
+                icon_path = "./assets/white_full.png" if is_dark else "./assets/black_full.png"
+            else:
+                icon_path = "./assets/white_empty.png" if is_dark else "./assets/black_empty.png"
+        
+        self.setIcon(QIcon(icon_path))
+    
+    def setLang(self, file):
+        """Устанавливает язык приложения"""
         settings["lang"] = file
-        with open("./settings.json", "w") as f:
-            json.dump(settings, f)
-        with open(settings["lang"], "r+", encoding="UTF-8") as f:
-            global translation
-            translation = json.load(f)
         
+        # Сохраняем настройки
+        with open("./settings.json", "w", encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+        
+        # Загружаем переводы
+        try:
+            with open(file, "r", encoding="UTF-8") as f:
+                global translation
+                translation = json.load(f)
+        except:
+            translation = {}
+        
+        # Обновляем текст в меню
         self.open_bin.setText(translatable("element.open"))
         self.clear_bin.setText(translatable("element.clear"))
         self.settings_action.setText(translatable("element.settings"))
         self.exit_action.setText(translatable("element.close"))
         
+        # Закрываем диалог настроек, если он открыт
         if self.settings_dialog:
             self.settings_dialog.close()
             self.settings_dialog = None
-        
-        self.menu.update()
-        self.menu.close()
-        
+    
     def formatTooltip(self):
+        """Форматирует всплывающую подсказку"""
         bin_size = self.getBinSize()
         file_count = len(list(winshell.recycle_bin()))
         
+        # Определяем единицы измерения
         if bin_size < 1024:
             size_text = f"{bin_size:.1f} {translatable('tooltip.kb')}"
         elif bin_size < 1048576:
-            size_text = f"{bin_size/1024:.1f} {translatable('tooltip.mb')}"
+            size_text = f"{bin_size / 1024:.1f} {translatable('tooltip.mb')}"
         else:
-            size_text = f"{bin_size/1048576:.1f} {translatable('tooltip.gb')}"
+            size_text = f"{bin_size / 1048576:.1f} {translatable('tooltip.gb')}"
         
-        file_word = self.getWordForm(file_count, translatable("tooltip.f1"), translatable("tooltip.f2"), translatable("tooltip.f3")) 
+        # Определяем правильную форму слова "файл"
+        file_word = self.getWordForm(
+            file_count,
+            translatable("tooltip.f1"),
+            translatable("tooltip.f2"),
+            translatable("tooltip.f3")
+        )
+        
         self.setToolTip(f"{file_count} {file_word}\n{size_text}")
-      
+    
     def getWordForm(self, n, f1, f2, f3):
+        """Возвращает правильную форму слова в зависимости от числа"""
         n %= 100
         n1 = n % 10
-        if n >= 10 and n <= 20:
+        
+        if 10 <= n <= 20:
             return f3
         elif n1 == 1:
             return f1
@@ -336,12 +673,14 @@ class TrashTrayIcon(QSystemTrayIcon):
         return f3
     
     def getBinSize(self):
+        """Возвращает размер корзины в килобайтах"""
         bin_info = BinInfo()
         bin_info.cbSize = ctypes.sizeof(BinInfo)
         ctypes.windll.shell32.SHQueryRecycleBinW(None, ctypes.byref(bin_info))
-        return bin_info.i64Size / 1024
-            
+        return bin_info.i64Size / 1024 if bin_info.i64Size else 0
+    
     def clearBin(self):
+        """Очищает корзину"""
         if list(winshell.recycle_bin()):
             winshell.recycle_bin().empty()
             self.updateIcon()
@@ -350,64 +689,137 @@ class TrashTrayIcon(QSystemTrayIcon):
 class DragDropWindow(QWidget):
     def __init__(self, tray):
         super().__init__()
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        self.tray = tray
+        
+        # Настройки окна
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setWindowOpacity(0.01)
         self.setFixedSize(30, 40)
         self.move(1015, 676)
-        self.tray = tray
         self.setAcceptDrops(True)
         
+        # Таймер для отслеживания положения мыши
         self.timer = QTimer()
         self.timer.timeout.connect(self.onMousePosition)
         self.timer.start(50)
-
+    
     def onMousePosition(self):
+        """Показывает окно при перетаскивании над иконкой"""
         cursor_pos = QCursor.pos()
-        self.icon_rect = self.tray.geometry().getRect()
-        x1, y1, w, h = self.icon_rect
-        x2, y2 = x1 + w, y1 + h
         
-        if x1 <= cursor_pos.x() <= x2 and y1 <= cursor_pos.y() <= y2 and windll.user32.GetKeyState(0x01) > 1:
-            self.move(x1, y1)
-            self.show()
-        else:
+        try:
+            geo = self.tray.geometry()
+            x1, y1, w, h = geo.x(), geo.y(), geo.width(), geo.height()
+            
+            # Проверяем, находится ли курсор над иконкой и зажата ли левая кнопка мыши
+            left_button_pressed = windll.user32.GetKeyState(0x01) & 0x8000
+            
+            if (x1 <= cursor_pos.x() <= x1 + w and 
+                y1 <= cursor_pos.y() <= y1 + h and 
+                left_button_pressed):
+                self.move(x1, y1)
+                self.show()
+            else:
+                self.hide()
+        except:
             self.hide()
-
+    
     def dragEnterEvent(self, event):
+        """Принимает перетаскиваемые файлы"""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             event.setDropAction(Qt.DropAction.MoveAction)
     
     def dropEvent(self, event):
+        """Обрабатывает сброс файлов в корзину"""
         if event.mimeData().hasUrls():
-            files = [i.toLocalFile().replace("/", "\\") for i in event.mimeData().urls()]
-            send2trash(files)
-            self.tray.updateIcon()
+            files = [
+                url.toLocalFile().replace("/", "\\") 
+                for url in event.mimeData().urls()
+            ]
+            
+            try:
+                send2trash(files)
+                self.tray.updateIcon()
+            except Exception as e:
+                print(f"Ошибка при удалении файлов: {e}")
+            
             self.hide()
 
+def load_settings():
+    """Загружает настройки из файла"""
+    default_settings = {
+        "app_name": "FoxBin",
+        "lang": "./lang/ru.json",
+        "icon_empty": "./assets/white_empty.png",
+        "icon_full": "./assets/white_full.png"
+    }
+    
+    try:
+        with open("./settings.json", "r", encoding='utf-8') as f:
+            loaded_settings = json.load(f)
+            # Объединяем с дефолтными значениями
+            return {**default_settings, **loaded_settings}
+    except:
+        # Если файл не существует или поврежден, создаем новый
+        with open("./settings.json", "w", encoding='utf-8') as f:
+            json.dump(default_settings, f, ensure_ascii=False, indent=2)
+        return default_settings
+
+def load_translation(lang_file):
+    """Загружает переводы из файла"""
+    try:
+        with open(lang_file, "r", encoding="UTF-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
 if __name__ == "__main__":
+    # Устанавливаем рабочую директорию
     os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
     
-    with open("./settings.json") as file:
-        settings = json.load(file)
+    # Загружаем настройки и переводы
+    settings = load_settings()
+    translation = load_translation(settings["lang"])
     
-    settings.setdefault("icon_empty", "./assets/white_empty.ico")
-    settings.setdefault("icon_full", "./assets/white_full.ico")
+    # Проверяем тему и обновляем дефолтные иконки при необходимости
+    is_dark = sysThemeIsDark()
+    default_empty = "./assets/white_empty.png" if is_dark else "./assets/black_empty.png"
+    default_full = "./assets/white_full.png" if is_dark else "./assets/black_full.png"
     
-    with open("./settings.json", "w") as file:
-        json.dump(settings, file)
+    # Если используются дефолтные иконки, обновляем их
+    default_icon_paths = {
+        "./assets/white_empty.png",
+        "./assets/black_empty.png",
+        "./assets/white_full.png", 
+        "./assets/black_full.png"
+    }
     
-    with open(settings["lang"], "r+", encoding="UTF-8") as file:
-        translation = json.load(file)
+    if settings.get("icon_empty", "") in default_icon_paths:
+        settings["icon_empty"] = default_empty
+        settings["icon_full"] = default_full
+        
+        # Сохраняем обновленные настройки
+        with open("./settings.json", "w", encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
     
+    # Создаем приложение
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+    app.setWindowIcon(QIcon('FoxBin.ico'))
     
+    # Создаем иконку в трее
     icon = QIcon(settings["icon_empty"])
     tray = TrashTrayIcon(icon)
     tray.setVisible(True)
     
-    window = DragDropWindow(tray)
-    window.show()
+    # Создаем окно для перетаскивания
+    drag_window = DragDropWindow(tray)
+    drag_window.show()
     
+    # Запускаем приложение
     sys.exit(app.exec())
