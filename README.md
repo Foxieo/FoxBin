@@ -15,13 +15,9 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </div>
 
-<p align="center">
-  <b>Легковесное приложение для системного трея Windows с доступом к корзине</b>
-</p>
-
 ---
 
-## 🌍 Многоязычная поддержка
+## 🌍 Multilingual support
 
 <details>
 <summary><img src="https://flagcdn.com/w20/ru.png" width="20" height="15"> Русский</summary>
