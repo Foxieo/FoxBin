@@ -5,7 +5,7 @@
 
 </div>
 <br>
-
+<img width="1400" height="820" alt="Group 29 (1)" src="https://github.com/user-attachments/assets/db828317-5bf0-4050-8cc9-088bb7f832f6" />
 <br>
 <br>
 <div align="center">
