@@ -15,7 +15,9 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </div>
 
----
+<div align="center">
+  #MiniBin #TrayBin #MiniTrash #TrayTrash #SimpleBin #TinyBin
+</div>
 
 ## 🌍 Multilingual support
 
